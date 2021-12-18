@@ -1,0 +1,10 @@
+.DS_Store
+
+video-converter.rc
+video-converter.syso
+video-converter_amd64
+video-converter_arm64
+video-converter_universal
+
+video-converter*.exe
+video-converter*.app/
