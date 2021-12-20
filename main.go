@@ -30,9 +30,38 @@ var isCurrentlyConverting bool
 var convertingHelperMsg string
 var convertingFFmpegOutput bytes.Buffer
 
+var sizeComboBoxLists = []string{
+	"original",
+	"480p",
+	"720p",
+	"1080p",
+}
+var sizeComboBoxIdx int32 = 0
+var sizeToConvert = "original"
+
+var resultingFilePrefix = "cvt-"
+
 var (
 	VERSION = "development"
 )
+
+func ffmpegOutputKwargs() ffmpeg.KwArgs {
+	args := ffmpeg.KwArgs{
+		"c:a": "copy",
+		"c:v": "libx264",
+	}
+
+	switch sizeToConvert {
+	case "480p":
+		args["filter:v"] = "scale=trunc(oh*a/2)*2:480"
+	case "720p":
+		args["filter:v"] = "scale=trunc(oh*a/2)*2:720"
+	case "1080p":
+		args["filter:v"] = "scale=trunc(oh*a/2)*2:1080"
+	}
+
+	return args
+}
 
 func ffmpegCheck() {
 	if _, err := exec.LookPath("ffmpeg"); nil != err {
@@ -122,16 +151,20 @@ func convertVideo() {
 		convertingHelperMsg = ""
 
 		go func(videoPath string, wg *sync.WaitGroup) {
-
 			dirname := filepath.Dir(videoPath)
 			filename := filepath.Base(videoPath)
 			// fileext := filepath.Ext(videoPath)
 
-			convertedPath := fmt.Sprintf("%s/cvt-%s", dirname, filename)
+			fileprefix := resultingFilePrefix
+			if "original" != sizeToConvert {
+				fileprefix += fmt.Sprintf("%s-", sizeToConvert)
+			}
+
+			convertedPath := fmt.Sprintf("%s/%s%s", dirname, fileprefix, filename)
 			convertingHelperMsg = fmt.Sprintf("currently converting:\n %s\ndestination:\n %s", videoPath, convertedPath)
 
 			isCurrentlyConverting = true
-			err := ffmpeg.Input(videoPath).Output(convertedPath).OverWriteOutput().WithErrorOutput(&convertingFFmpegOutput).Run()
+			err := ffmpeg.Input(videoPath).Output(convertedPath, ffmpegOutputKwargs()).OverWriteOutput().WithErrorOutput(&convertingFFmpegOutput).Run()
 			if nil != err {
 				convertingHelperMsg = err.Error()
 			} else {
@@ -142,6 +175,7 @@ func convertVideo() {
 			isCurrentlyConverting = false
 			convertingFFmpegOutput.Reset()
 
+			// deliberate sleep before finish
 			time.Sleep(3 * time.Second)
 			wg.Done()
 		}(videoFilename, &wg)
@@ -180,33 +214,47 @@ func myLayouts() []g.Widget {
 
 	if 0 == len(listOfVideos) {
 		widgets = append(widgets, []g.Widget{
-			g.Dummy(100, 180),
+			g.Dummy(0, 180),
 			g.Style().SetFontSize(20).To(
 				g.Align(g.AlignCenter).To(g.Label("Drag and Drop your video files here!")),
 			),
 			g.Align(g.AlignCenter).To(g.Label("Only video files are allowed")),
-			g.Dummy(100, 180),
+			g.Dummy(0, 180),
 		}...)
 	} else {
 		widgets = append(widgets, []g.Widget{
-			g.Dummy(100, 15),
+			g.Dummy(0, 15),
 			g.Label("Convert List"),
 			g.Row(
 				g.Dummy(10, 0),
 				g.Label(strings.Join(listOfVideos, "\n")).Wrapped(true),
 			),
-			g.Dummy(100, 30),
+			g.Dummy(0, 10),
+			g.Row(
+				g.Label("size"),
+				g.Dummy(10, 0),
+				g.Combo("", sizeComboBoxLists[sizeComboBoxIdx], sizeComboBoxLists, &sizeComboBoxIdx).OnChange(func() {
+					sizeToConvert = sizeComboBoxLists[sizeComboBoxIdx]
+				}),
+			),
+			g.Row(
+				g.Label("prefix"),
+				g.Dummy(10, 0),
+				g.InputText(&resultingFilePrefix),
+			),
+			g.Dummy(0, 30),
 			g.Button("Execute").OnClick(onClickConvert).Disabled(isCurrentlyConverting),
 
 			g.Label(convertingHelperMsg).Wrapped(true),
-			g.Dummy(100, 10),
+			g.Dummy(0, 10),
 		}...)
 
 		if isCurrentlyConverting {
 			outputString := convertingFFmpegOutput.String()
 			substring := ""
 
-			g.Context.GetPlatform().Update()
+			// force ui update on doing conversion
+			g.Update()
 
 			if 100 > len(outputString) {
 				substring = outputString
@@ -243,6 +291,10 @@ func main() {
 	wnd := g.NewMasterWindow(fmt.Sprintf("video converter - %s", VERSION), 400, 400, g.MasterWindowFlagsNotResizable)
 
 	g.Context.GetPlatform().SetDropCallback(func(filenames []string) {
+		if isCurrentlyConverting {
+			return
+		}
+
 		if 0 < len(listOfVideos) {
 			listOfVideos = []string{}
 		}

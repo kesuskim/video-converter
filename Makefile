@@ -1,7 +1,11 @@
 TARGET = video-converter
-VERSION = 0.0.1
+VERSION = 0.0.2
 
-all: build-mac build-win
+all: dist
+
+dist: build-mac build-win
+	zip -r $(TARGET)_$(VERSION).macOS_universal.zip $(TARGET)_$(VERSION).app
+	zip -r $(TARGET)_$(VERSION).windows_x64.zip $(TARGET)_$(VERSION).exe
 
 build-icon:
 	go run scripts/generate_icon.go
@@ -14,6 +18,7 @@ clean:
 	rm -rf $(TARGET)_*.exe
 	rm -rf $(TARGET).app
 	rm -rf $(TARGET)_*.app
+	rm -rf $(TARGET)_*.zip
 
 
 # TODO
