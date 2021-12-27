@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,9 +16,13 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
+
 	g "github.com/AllenDang/giu"
 
 	ffmpeg "github.com/u2takey/ffmpeg-go"
+
+	_ "embed"
 )
 
 var IS_DEV = false
@@ -30,28 +35,79 @@ var isCurrentlyConverting bool
 var convertingHelperMsg string
 var convertingFFmpegOutput bytes.Buffer
 
-var sizeComboBoxLists = []string{
+var ffmpegCancelChannel = make(chan struct{})
+
+var resComboBoxLists = []string{
 	"original",
 	"480p",
 	"720p",
 	"1080p",
 }
-var sizeComboBoxIdx int32 = 0
-var sizeToConvert = "original"
+var resComboBoxIdx int32 = 0
+var resToUse = "original"
+
+var audioCodecComboBoxLists = []string{
+	"original",
+	"AAC",
+	"OPUS",
+	"VORBIS",
+}
+var audioCodecComboBoxIdx int32 = 0
+var audioCodecToUse = "original"
+
+var videoCodecComboBoxLists = []string{
+	"original",
+	"H.264",
+	"H.265",
+}
+var videoCodecComboBoxIdx int32 = 0
+var videoCodecToUse = "original"
+
+var containerFormatComboBoxLists = []string{
+	"original",
+	"mp4",
+	"mkv",
+}
+var containerFormatComboBoxIdx int32 = 0
+var containerFormatToUse = "original"
 
 var resultingFilePrefix = "cvt-"
+
+//go:embed res/NanumGothic-Regular.ttf
+var fontBytes []byte
 
 var (
 	VERSION = "development"
 )
 
+func init() {
+	g.SetDefaultFontFromBytes(fontBytes, 16)
+}
+
 func ffmpegOutputKwargs() ffmpeg.KwArgs {
 	args := ffmpeg.KwArgs{
 		"c:a": "copy",
-		"c:v": "libx264",
+		"c:v": "copy",
 	}
 
-	switch sizeToConvert {
+	switch audioCodecToUse {
+	case "AAC":
+		args["c:a"] = "aac"
+	case "OPUS":
+		args["c:a"] = "libopus"
+		args["b:a"] = "96k"
+	case "VORBIS":
+		args["c:a"] = "libvorbis"
+	}
+
+	switch videoCodecToUse {
+	case "H.264":
+		args["c:v"] = "libx264"
+	case "H.265":
+		args["c:v"] = "libx265"
+	}
+
+	switch resToUse {
 	case "480p":
 		args["filter:v"] = "scale=trunc(oh*a/2)*2:480"
 	case "720p":
@@ -63,11 +119,13 @@ func ffmpegOutputKwargs() ffmpeg.KwArgs {
 	return args
 }
 
-func ffmpegCheck() {
-	if _, err := exec.LookPath("ffmpeg"); nil != err {
-		isFfmpegReady = false
-	} else {
-		isFfmpegReady = true
+func checkFfmpegAndFfprobe() {
+	isFfmpegReady = false
+
+	if _, err := exec.LookPath("ffmpeg"); nil == err {
+		if _, err := exec.LookPath("ffprobe"); nil == err {
+			isFfmpegReady = true
+		}
 	}
 }
 
@@ -78,7 +136,30 @@ func updateEnvPath() {
 	os.Setenv("PATH", fmt.Sprintf("%s%c%s", os.Getenv("PATH"), os.PathListSeparator, tmpbinPath))
 }
 
-func downloadGzippedFfmpegFromURL(url string) error {
+func downloadFileFromURL(url, filename string) error {
+	resp, err := http.Get(url)
+	if nil != err {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if "windows" == runtime.GOOS {
+		filename += ".exe"
+	}
+
+	f, err := os.OpenFile(path.Join(tmpbinPath, filename), os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+	if nil != err {
+		return err
+	}
+
+	if _, err := io.Copy(f, resp.Body); nil != err {
+		return err
+	}
+
+	return nil
+}
+
+func downloadGzippedFileFromURL(url, filename string) error {
 	resp, err := http.Get(url)
 	if nil != err {
 		return err
@@ -91,12 +172,11 @@ func downloadGzippedFfmpegFromURL(url string) error {
 	}
 	defer gzReader.Close()
 
-	ffmpegExe := "ffmpeg"
 	if "windows" == runtime.GOOS {
-		ffmpegExe += ".exe"
+		filename += ".exe"
 	}
 
-	f, err := os.OpenFile(path.Join(tmpbinPath, ffmpegExe), os.O_CREATE|os.O_RDWR, os.FileMode(0755))
+	f, err := os.OpenFile(path.Join(tmpbinPath, filename), os.O_CREATE|os.O_RDWR, os.FileMode(0755))
 	if nil != err {
 		return err
 	}
@@ -108,20 +188,120 @@ func downloadGzippedFfmpegFromURL(url string) error {
 	return nil
 }
 
-func downloadFfmpeg() {
+func downloadFfmpegAndFfprobe() {
 	switch runtime.GOOS {
 	case "darwin":
 		if "arm64" == runtime.GOARCH {
-			downloadGzippedFfmpegFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-arm64.gz")
+			downloadGzippedFileFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-arm64.gz", "ffmpeg")
+			downloadFileFromURL("https://github.com/descriptinc/ffmpeg-ffprobe-static/releases/download/b4.4.0-rc.11/ffprobe-darwin-arm64", "ffprobe")
 		} else {
-			downloadGzippedFfmpegFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-x64.gz")
+			downloadGzippedFileFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/darwin-x64.gz", "ffmpeg")
+			downloadGzippedFileFromURL("https://github.com/descriptinc/ffmpeg-ffprobe-static/releases/download/b4.4.0-rc.11/ffprobe-darwin-x64.gz", "ffprobe")
 		}
 	case "windows":
-		downloadGzippedFfmpegFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/win32-x64.gz")
+		downloadGzippedFileFromURL("https://github.com/eugeneware/ffmpeg-static/releases/download/b4.4/win32-x64.gz", "ffmpeg")
+		downloadGzippedFileFromURL("https://github.com/descriptinc/ffmpeg-ffprobe-static/releases/download/b4.4.0-rc.11/ffprobe-win32-x64.gz", "ffprobe")
 
 	default:
 		panic("not supported OS")
 	}
+}
+
+type ffprobeOutput struct {
+	Streams []struct {
+		Index              int    `json:"index"`
+		CodecName          string `json:"codec_name"`
+		CodecLongName      string `json:"codec_long_name"`
+		Profile            string `json:"profile"`
+		CodecType          string `json:"codec_type"`
+		CodecTagString     string `json:"codec_tag_string"`
+		CodecTag           string `json:"codec_tag"`
+		Width              int    `json:"width,omitempty"`
+		Height             int    `json:"height,omitempty"`
+		CodedWidth         int    `json:"coded_width,omitempty"`
+		CodedHeight        int    `json:"coded_height,omitempty"`
+		ClosedCaptions     int    `json:"closed_captions,omitempty"`
+		HasBFrames         int    `json:"has_b_frames,omitempty"`
+		SampleAspectRatio  string `json:"sample_aspect_ratio,omitempty"`
+		DisplayAspectRatio string `json:"display_aspect_ratio,omitempty"`
+		PixFmt             string `json:"pix_fmt,omitempty"`
+		Level              int    `json:"level,omitempty"`
+		ColorRange         string `json:"color_range,omitempty"`
+		ColorSpace         string `json:"color_space,omitempty"`
+		ColorTransfer      string `json:"color_transfer,omitempty"`
+		ColorPrimaries     string `json:"color_primaries,omitempty"`
+		ChromaLocation     string `json:"chroma_location,omitempty"`
+		Refs               int    `json:"refs,omitempty"`
+		IsAvc              string `json:"is_avc,omitempty"`
+		NalLengthSize      string `json:"nal_length_size,omitempty"`
+		RFrameRate         string `json:"r_frame_rate"`
+		AvgFrameRate       string `json:"avg_frame_rate"`
+		TimeBase           string `json:"time_base"`
+		StartPts           int    `json:"start_pts"`
+		StartTime          string `json:"start_time"`
+		DurationTs         int    `json:"duration_ts"`
+		Duration           string `json:"duration"`
+		BitRate            string `json:"bit_rate"`
+		BitsPerRawSample   string `json:"bits_per_raw_sample,omitempty"`
+		NbFrames           string `json:"nb_frames"`
+		Disposition        struct {
+			Default         int `json:"default"`
+			Dub             int `json:"dub"`
+			Original        int `json:"original"`
+			Comment         int `json:"comment"`
+			Lyrics          int `json:"lyrics"`
+			Karaoke         int `json:"karaoke"`
+			Forced          int `json:"forced"`
+			HearingImpaired int `json:"hearing_impaired"`
+			VisualImpaired  int `json:"visual_impaired"`
+			CleanEffects    int `json:"clean_effects"`
+			AttachedPic     int `json:"attached_pic"`
+			TimedThumbnails int `json:"timed_thumbnails"`
+		} `json:"disposition"`
+		Tags struct {
+			Language    string `json:"language"`
+			HandlerName string `json:"handler_name"`
+			VendorID    string `json:"vendor_id"`
+		} `json:"tags"`
+		SampleFmt     string `json:"sample_fmt,omitempty"`
+		SampleRate    string `json:"sample_rate,omitempty"`
+		Channels      int    `json:"channels,omitempty"`
+		ChannelLayout string `json:"channel_layout,omitempty"`
+		BitsPerSample int    `json:"bits_per_sample,omitempty"`
+	} `json:"streams"`
+	Format struct {
+		Filename       string `json:"filename"`
+		NbStreams      int    `json:"nb_streams"`
+		NbPrograms     int    `json:"nb_programs"`
+		FormatName     string `json:"format_name"`
+		FormatLongName string `json:"format_long_name"`
+		StartTime      string `json:"start_time"`
+		Duration       string `json:"duration"`
+		Size           string `json:"size"`
+		BitRate        string `json:"bit_rate"`
+		ProbeScore     int    `json:"probe_score"`
+		Tags           struct {
+			MajorBrand       string `json:"major_brand"`
+			MinorVersion     string `json:"minor_version"`
+			CompatibleBrands string `json:"compatible_brands"`
+			Encoder          string `json:"encoder"`
+		} `json:"tags"`
+	} `json:"format"`
+}
+
+func detectWithFfprobe(filename string) (ffprobeOutput, error) {
+	var ret ffprobeOutput
+	probeOutputString, err := ffmpeg.Probe(filename)
+	if nil != err {
+		return ret, err
+	}
+
+	err = json.Unmarshal([]byte(probeOutputString), &ret)
+	if nil != err {
+		return ret, err
+	}
+
+	return ret, nil
 }
 
 func detectFileMimetype(filename string) (string, error) {
@@ -142,6 +322,10 @@ func onClickConvert() {
 	go convertVideo()
 }
 
+func onClickCancel() {
+	ffmpegCancelChannel <- struct{}{}
+}
+
 func convertVideo() {
 	var wg sync.WaitGroup
 
@@ -153,24 +337,46 @@ func convertVideo() {
 		go func(videoPath string, wg *sync.WaitGroup) {
 			dirname := filepath.Dir(videoPath)
 			filename := filepath.Base(videoPath)
-			// fileext := filepath.Ext(videoPath)
+			fileext := filepath.Ext(videoPath)
+			filenameWithoutExt := strings.TrimRight(filename, fileext)
 
 			fileprefix := resultingFilePrefix
-			if "original" != sizeToConvert {
-				fileprefix += fmt.Sprintf("%s-", sizeToConvert)
+			if "original" != resToUse {
+				fileprefix += fmt.Sprintf("%s-", resToUse)
 			}
 
-			convertedPath := fmt.Sprintf("%s/%s%s", dirname, fileprefix, filename)
+			switch containerFormatToUse {
+			case "mp4":
+				fileext = ".mp4"
+			case "mkv":
+				fileext = ".mkv"
+			}
+
+			convertedPath := fmt.Sprintf("%s/%s%s%s", dirname, fileprefix, filenameWithoutExt, fileext)
 			convertingHelperMsg = fmt.Sprintf("currently converting:\n %s\ndestination:\n %s", videoPath, convertedPath)
 
 			isCurrentlyConverting = true
-			err := ffmpeg.Input(videoPath).Output(convertedPath, ffmpegOutputKwargs()).OverWriteOutput().WithErrorOutput(&convertingFFmpegOutput).Run()
-			if nil != err {
+			ffmpegCmd := ffmpeg.Input(videoPath).Output(convertedPath, ffmpegOutputKwargs()).OverWriteOutput().WithErrorOutput(&convertingFFmpegOutput).Compile()
+			ffmpegFinishChannel := make(chan struct{})
+
+			go func() {
+				select {
+				case <-ffmpegCancelChannel:
+					isConversionPreparing = false
+					isCurrentlyConverting = false
+					ffmpegCmd.Process.Kill()
+				case <-ffmpegFinishChannel:
+					break
+				}
+			}()
+
+			if err := ffmpegCmd.Run(); nil != err {
 				convertingHelperMsg = err.Error()
 			} else {
 				convertingHelperMsg = fmt.Sprintf("finish conversion\ndestination:\n %s", convertedPath)
 			}
 
+			close(ffmpegFinishChannel)
 			isConversionPreparing = false
 			isCurrentlyConverting = false
 			convertingFFmpegOutput.Reset()
@@ -231,10 +437,10 @@ func myLayouts() []g.Widget {
 			),
 			g.Dummy(0, 10),
 			g.Row(
-				g.Label("size"),
+				g.Label("resolution"),
 				g.Dummy(10, 0),
-				g.Combo("", sizeComboBoxLists[sizeComboBoxIdx], sizeComboBoxLists, &sizeComboBoxIdx).OnChange(func() {
-					sizeToConvert = sizeComboBoxLists[sizeComboBoxIdx]
+				g.Combo("", resComboBoxLists[resComboBoxIdx], resComboBoxLists, &resComboBoxIdx).OnChange(func() {
+					resToUse = resComboBoxLists[resComboBoxIdx]
 				}),
 			),
 			g.Row(
@@ -242,8 +448,32 @@ func myLayouts() []g.Widget {
 				g.Dummy(10, 0),
 				g.InputText(&resultingFilePrefix),
 			),
-			g.Dummy(0, 30),
-			g.Button("Execute").OnClick(onClickConvert).Disabled(isCurrentlyConverting),
+			g.Row(
+				g.Label("audio codec"),
+				g.Dummy(10, 0),
+				g.Combo("", audioCodecComboBoxLists[audioCodecComboBoxIdx], audioCodecComboBoxLists, &audioCodecComboBoxIdx).OnChange(func() {
+					audioCodecToUse = audioCodecComboBoxLists[audioCodecComboBoxIdx]
+				}),
+			),
+			g.Row(
+				g.Label("video codec"),
+				g.Dummy(10, 0),
+				g.Combo("", videoCodecComboBoxLists[videoCodecComboBoxIdx], videoCodecComboBoxLists, &videoCodecComboBoxIdx).OnChange(func() {
+					videoCodecToUse = videoCodecComboBoxLists[videoCodecComboBoxIdx]
+				}),
+			),
+			g.Row(
+				g.Label("container"),
+				g.Dummy(10, 0),
+				g.Combo("", containerFormatComboBoxLists[containerFormatComboBoxIdx], containerFormatComboBoxLists, &containerFormatComboBoxIdx).OnChange(func() {
+					containerFormatToUse = containerFormatComboBoxLists[containerFormatComboBoxIdx]
+				}),
+			),
+			g.Dummy(0, 10),
+			g.Row(
+				g.Button("Execute").OnClick(onClickConvert).Disabled(isCurrentlyConverting),
+				g.Button("Cancel").OnClick(onClickCancel).Disabled(!isCurrentlyConverting),
+			),
 
 			g.Label(convertingHelperMsg).Wrapped(true),
 			g.Dummy(0, 10),
@@ -279,12 +509,12 @@ func loop() {
 
 func main() {
 	go func() {
-		ffmpegCheck()
+		checkFfmpegAndFfprobe()
 		if !isFfmpegReady {
 			updateEnvPath()
-			ffmpegCheck()
-			downloadFfmpeg()
-			ffmpegCheck()
+			checkFfmpegAndFfprobe()
+			downloadFfmpegAndFfprobe()
+			checkFfmpegAndFfprobe()
 		}
 	}()
 
@@ -301,13 +531,20 @@ func main() {
 
 		if 0 < len(filenames) {
 			for _, filename := range filenames {
-				mimetype, err := detectFileMimetype(filename)
-				if nil != err {
-					panic(err)
+				filestat, err := os.Stat(filename)
+				if nil != err || filestat.IsDir() {
+					continue
 				}
 
-				if strings.HasPrefix(mimetype, "video/") {
+				filename = norm.NFC.String(filename)
+
+				// TODO
+				// if ffprobeOutput, err := detectWithFfprobe(filename); nil == err {
+				if _, err := detectWithFfprobe(filename); nil == err {
 					listOfVideos = append(listOfVideos, filename)
+					// for _, ffprobeOutputStream := range ffprobeOutput.Streams {
+					// 	codecName := ffprobeOutputStream.CodecName
+					// }
 				}
 			}
 		}
