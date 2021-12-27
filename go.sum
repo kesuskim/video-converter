@@ -1,9 +1,9 @@
-github.com/AllenDang/giu v0.5.7-0.20211126093710-9c5613537bba h1:ItIfawX+2H+z9x8/i14YnnJbUhy4VvqjehzfqFarqsc=
-github.com/AllenDang/giu v0.5.7-0.20211126093710-9c5613537bba/go.mod h1:CiJjSc6zdYf9BK/NlMXYzZtnoMv7U9R7wcBGSVNImFk=
+github.com/AllenDang/giu v0.6.0 h1:9BqqTqO1LoeC5FWMkP7qVM2lxxTnuqvRzI0dxXhRxSw=
+github.com/AllenDang/giu v0.6.0/go.mod h1:scFTU6HXIZIT254MZ+ZOlB9pSh2Z/pLGn2p2bEY8m6s=
 github.com/AllenDang/go-findfont v0.0.0-20200702051237-9f180485aeb8 h1:dKZMqib/yUDoCFigmz2agG8geZ/e3iRq304/KJXqKyw=
 github.com/AllenDang/go-findfont v0.0.0-20200702051237-9f180485aeb8/go.mod h1:b4uuDd0s6KRIPa84cEEchdQ9ICh7K0OryZHbSzMca9k=
-github.com/AllenDang/imgui-go v1.12.1-0.20211125032311-706be5bb9dd6 h1:BzLQ4Gh+aIyoT2QULSGe1h3foI+7Ss+gicb6SHN9BtU=
-github.com/AllenDang/imgui-go v1.12.1-0.20211125032311-706be5bb9dd6/go.mod h1:2jS7bvvG+PejKdNu4eg2UYqx7Ky8IXGAhxOfjq9qTNk=
+github.com/AllenDang/imgui-go v1.12.1-0.20211220065947-c3e78789ac41 h1:ShBssS1coPMbWwR9t2iOe1fHw6mepKvRR1OuD/EI4PQ=
+github.com/AllenDang/imgui-go v1.12.1-0.20211220065947-c3e78789ac41/go.mod h1:lSWsbR1qGBZz405YzfHXcwEyWQq206QC7cYMHoLvmI4=
 github.com/J-Siu/go-helper v0.0.0-20200831211848-b952ab4d60dd h1:T9YJZEh+dpSnLQjdghlzlvex2TEDqYDkTFCMH20ZW7A=
 github.com/J-Siu/go-helper v0.0.0-20200831211848-b952ab4d60dd/go.mod h1:osOB48394q2nxkD4Ch6/kmSKqCgEHe7ALnsHDLAkO2w=
 github.com/aws/aws-sdk-go v1.38.20 h1:QbzNx/tdfATbdKfubBpkt84OM6oBkxQZRw6+bW2GyeA=
@@ -17,11 +17,10 @@ github.com/faiface/mainthread v0.0.0-20171120011319-8b78f0a41ae3 h1:baVdMKlASEHr
 github.com/faiface/mainthread v0.0.0-20171120011319-8b78f0a41ae3/go.mod h1:VEPNJUlxl5KdWjDvz6Q1l+rJlxF2i6xqDeGuGAxa87M=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/go-gl/gl v0.0.0-20210315015930-ae072cafe09d/go.mod h1:482civXOzJJCPzJ4ZOX/pwvXBWSnzD4OKMdH4ClKGbk=
-github.com/go-gl/gl v0.0.0-20211025173605-bda47ffaa784 h1:1Zi56D0LNfvkzM+BdoxKryvUEdyWO7LP8oRT+oSYJW0=
-github.com/go-gl/gl v0.0.0-20211025173605-bda47ffaa784/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
-github.com/go-gl/glfw/v3.3/glfw v0.0.0-20210727001814-0db043d8d5be/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
-github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211024062804-40e447a793be h1:Z28GdQBfKOL8tNHjvaDn3wHDO7AzTRkmAXvHvnopp98=
-github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211024062804-40e447a793be/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
+github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6 h1:zDw5v7qm4yH7N8C8uWd+8Ii9rROdgWxQuGoJ9WDXxfk=
+github.com/go-gl/gl v0.0.0-20211210172815-726fda9656d6/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
+github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211213063430-748e38ca8aec h1:3FLiRYO6PlQFDpUU7OEFlWgjGD1jnBIVSJ5SYRWk+9c=
+github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211213063430-748e38ca8aec/go.mod h1:tQ2UAYgL5IevRw8kRxooKSPJfGvJ9fJQFa0TUsXzTg8=
 github.com/go-logr/logr v0.1.0/go.mod h1:ixOQHD9gLJUVQQ2ZOR7zLEifBX6tGkNJF4QyIY7sIas=
 github.com/go-resty/resty/v2 v2.7.0 h1:me+K9p3uhSmXtrBZ4k9jcEAfJmuC8IivWHwaLZwPrFY=
 github.com/go-resty/resty/v2 v2.7.0/go.mod h1:9PWDzw47qPphMRFfhsyk0NnSgvluHcljSMVIq3w7q0I=
@@ -84,7 +83,6 @@ golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9sn
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
-golang.org/x/text v0.3.6 h1:aRYxNxv6iGQlyVaZmk6ZgYEDa+Jg18DxebPSrd6bg1M=
 golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
 golang.org/x/text v0.3.7 h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=
 golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=
